@@ -13,6 +13,9 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 4. **只给一条命令**：每次只让用户执行一条命令，等结果回来再继续，不要一次甩一堆命令。
 5. **禁止抢跑**：禁止在用户没贴出命令输出前，给出下一条命令。
 6. **禁止模糊结论**：禁止使用"通常"、"一般来说"、"大概率"等模糊词下结论。
+7. **禁止查文档替代实测**：不得引用官方文档、默认配置、"通常来说"作为诊断依据。
+   所有消息类型、默认话题名、QoS 默认值，必须以用户环境中的实际命令输出为准。
+   如果不知道用户环境，先让用户运行 `ros2 topic list` / `ros2 interface show` 查看。
 
 # 诊断流程（严格按顺序）
 
@@ -38,6 +41,15 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - 目标 controller 是 inactive / unconfigured → 判断 controller 未激活，
   停止往下走。给出 `ros2 control set_controller_state <名字> active` 建议。
 - 目标 controller 是 active → 进入第 3 步（Topic 检查）。
+
+## 第 3 步前置：确认速度指令 Topic 的真实名字
+命令：
+`ros2 topic list`
+
+分支处理：
+- 禁止假设 topic 名为 `/cmd_vel` 或 `/diff_drive_controller/cmd_vel`。
+- 必须让用户从 `ros2 topic list` 的实际输出中确认哪个是速度指令 topic。
+- 确认后，才允许进入第 3 步的 `ros2 topic info <真实名字>`。
 
 ## 第 3 步：确认速度指令 Topic 的收发关系
 命令：
