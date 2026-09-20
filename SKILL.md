@@ -16,6 +16,10 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 7. **禁止查文档替代实测**：不得引用官方文档、默认配置、"通常来说"作为诊断依据。
    所有消息类型、默认话题名、QoS 默认值，必须以用户环境中的实际命令输出为准。
    如果不知道用户环境，先让用户运行 `ros2 topic list` / `ros2 interface show` 查看。
+8. **禁止重复命令**：在给出下一步命令前，必须先确认这条命令在本次诊断中是否已经执行过。
+   如果已经执行过，直接基于已有输出做判断，不得要求用户重新执行。
+   特别是 `ros2 node list`、`ros2 topic list`、`ros2 control list_controllers`
+   这三条命令，整个诊断过程中各自只应执行一次。
 
 # 诊断流程（严格按顺序）
 
@@ -42,79 +46,52 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
   停止往下走。给出 `ros2 control set_controller_state <名字> active` 建议。
 - 目标 controller 是 active → 进入第 3 步（Topic 检查）。
 
-## 第 3 步前置：确认速度指令 Topic 的真实名字
+## 第 3 步：确认速度指令 Topic 的真实名字
 命令：
 `ros2 topic list`
 
 分支处理：
 - 禁止假设 topic 名为 `/cmd_vel` 或 `/diff_drive_controller/cmd_vel`。
 - 必须让用户从 `ros2 topic list` 的实际输出中确认哪个是速度指令 topic。
-- 确认后，才允许进入第 3 步的 `ros2 topic info <真实名字>`。
+- 确认后，进入第 4 步，使用真实 topic 名。
 
-## 第 3 步：确认速度指令 Topic 的收发关系
+## 第 4 步：确认速度指令 Topic 的收发关系
 命令：
-`ros2 topic info /cmd_vel`
-
-前置说明：
-- `/cmd_vel` 是常见默认名，但如果用户系统用了命名空间或自定义话题，
-  应先让用户执行 `ros2 topic list` 确认真实 topic 名，再执行 info。
-- 如果 `info` 报 "Topic not found"，让用户贴 `ros2 topic list` 的输出。
+`ros2 topic info <真实话题名>`
 
 分支处理：
 - 没有 Publisher → 指令源头（遥控/导航/上层）没在发，停止往下走。
-- 没有 Subscriber → controller 没订阅，检查 controller 配置里的 topic 名。
-- 两者都有 → 进入第 4 步（`ros2 topic echo`）。
-
-## 第 4 步：确认 Publisher / Subscriber 是否配对
-命令：
-`ros2 topic info /目标话题名`
-
-分支处理：
-- 没有 Publisher → 发布端节点没工作或没连上，停止往下走。
-- 没有 Subscriber → 订阅端没连上，停止往下走。
-- 两者都有 → 进入第 4 步。
+- 没有 Subscriber → controller 没订阅，检查 controller 配置里的 topic 名，停止往下走。
+- 两者都有 → 进入第 5 步。
 
 ## 第 5 步：确认是否有数据流过
 命令：
-`ros2 topic echo /目标话题名`
+`ros2 topic echo <真实话题名>`
 
 分支处理：
-- 无任何输出 → 没有数据，跳到第 6 步查 QoS。
-- 有数据输出 → 进入第 5 步。
+- 无任何输出 → 没有数据，跳到第 7 步查 QoS。
+- 有数据输出 → 进入第 6 步。
 
 ## 第 6 步：确认数据频率是否正常
 命令：
-`ros2 topic hz /目标话题名`
+`ros2 topic hz <真实话题名>`
 
 分支处理：
 - 频率为 0 或极低 → 发布端卡顿、阻塞或线程问题，停止往下走。
-- 频率正常 → 进入第 7 步。
+- 频率正常 → 进入第 8 步。
 
 ## 第 7 步：确认 QoS 是否匹配
 命令：
-`ros2 topic info /目标话题名 -v`
+`ros2 topic info <真实话题名> -v`
 
 分支处理：
-- Reliability（reliable / best_effort）或 Durability（transient_local / volatile）不匹配 → 这是"topic 存在但没数据"最常见原因，给出修改一端 QoS 的建议。
-- QoS 匹配 → 进入第 7 步。
+- Reliability（reliable / best_effort）或 Durability（transient_local / volatile）不匹配 → 这是"topic 存在但没数据"最常见原因，给出修改一端 QoS 的建议，停止往下走。
+- QoS 匹配 → 进入第 8 步。
 
 ## 第 8 步：确认全局通信链路
 命令：
 `rqt_graph`
 
 分支处理：
-- 图中存在孤立节点或断开的连线 → 指出断点位置。
+- 图中存在孤立节点或断开的连线 → 指出断点位置，停止往下走。
 - 链路完整 → 通信层全部正常，问题可能在控制算法或硬件执行层，此时才允许讨论算法。
-
-# 输出格式要求
-每次回复必须包含三部分：
-1. **当前步骤**：说明现在在第几步，为什么走到这里。
-2. **请执行**：给出**一条**命令。
-3. **等待**：明确告诉用户"把输出贴给我，我再判断下一步"。
-
-# 诊断结束
-当定位到具体环节后，输出格式：
-1. 故障层：Node / Topic / QoS / 频率 / 链路
-2. 证据：哪条命令的哪行输出
-3. 建议动作：一条可执行命令或一处代码/配置修改
-4. 验证方式：用哪条命令确认修好了
