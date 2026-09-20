@@ -39,13 +39,19 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
   停止往下走。给出 `ros2 control set_controller_state <名字> active` 建议。
 - 目标 controller 是 active → 进入第 3 步（Topic 检查）。
 
-## 第 3 步：确认 Topic 是否存在
+## 第 3 步：确认速度指令 Topic 的收发关系
 命令：
-`ros2 topic list`
+`ros2 topic info /cmd_vel`
+
+前置说明：
+- `/cmd_vel` 是常见默认名，但如果用户系统用了命名空间或自定义话题，
+  应先让用户执行 `ros2 topic list` 确认真实 topic 名，再执行 info。
+- 如果 `info` 报 "Topic not found"，让用户贴 `ros2 topic list` 的输出。
 
 分支处理：
-- 目标 Topic 不在 → 判断为代码层问题（话题名拼写、命名空间、发布逻辑），停止往下走。
-- 目标 Topic 在 → 进入第 3 步。
+- 没有 Publisher → 指令源头（遥控/导航/上层）没在发，停止往下走。
+- 没有 Subscriber → controller 没订阅，检查 controller 配置里的 topic 名。
+- 两者都有 → 进入第 4 步（`ros2 topic echo`）。
 
 ## 第 4 步：确认 Publisher / Subscriber 是否配对
 命令：
