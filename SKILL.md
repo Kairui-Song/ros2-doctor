@@ -25,9 +25,18 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
   追加命令：`ros2 daemon status` 和检查 `source`。
 - 有节点但没有控制节点 → 判断启动层问题，停止往下走。
   让用户检查 launch 文件和节点崩溃日志。
-- 有控制节点 → 进入第 2 步。
+- 有控制节点 → **无条件进入第 2 步，执行 `ros2 topic list`。**
+  **禁止使用 `ros2 control list_controllers` 或其他任何非流程命令替代。**
 
-## 第 2 步：确认 Topic 是否存在
+## 第 2 步：确认 Controller 状态
+命令：
+`ros2 control list_controllers`
+
+分支处理：
+- 有 controller 但不是 active → 判断 controller 加载/配置问题，停止往下走。
+- 所有 controller 都 active → 进入第 3 步（Topic 检查）。
+
+## 第 3 步：确认 Topic 是否存在
 命令：
 `ros2 topic list`
 
@@ -35,7 +44,7 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - 目标 Topic 不在 → 判断为代码层问题（话题名拼写、命名空间、发布逻辑），停止往下走。
 - 目标 Topic 在 → 进入第 3 步。
 
-## 第 3 步：确认 Publisher / Subscriber 是否配对
+## 第 4 步：确认 Publisher / Subscriber 是否配对
 命令：
 `ros2 topic info /目标话题名`
 
@@ -44,7 +53,7 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - 没有 Subscriber → 订阅端没连上，停止往下走。
 - 两者都有 → 进入第 4 步。
 
-## 第 4 步：确认是否有数据流过
+## 第 5 步：确认是否有数据流过
 命令：
 `ros2 topic echo /目标话题名`
 
@@ -52,7 +61,7 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - 无任何输出 → 没有数据，跳到第 6 步查 QoS。
 - 有数据输出 → 进入第 5 步。
 
-## 第 5 步：确认数据频率是否正常
+## 第 6 步：确认数据频率是否正常
 命令：
 `ros2 topic hz /目标话题名`
 
@@ -60,7 +69,7 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - 频率为 0 或极低 → 发布端卡顿、阻塞或线程问题，停止往下走。
 - 频率正常 → 进入第 7 步。
 
-## 第 6 步：确认 QoS 是否匹配
+## 第 7 步：确认 QoS 是否匹配
 命令：
 `ros2 topic info /目标话题名 -v`
 
@@ -68,7 +77,7 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 - Reliability（reliable / best_effort）或 Durability（transient_local / volatile）不匹配 → 这是"topic 存在但没数据"最常见原因，给出修改一端 QoS 的建议。
 - QoS 匹配 → 进入第 7 步。
 
-## 第 7 步：确认全局通信链路
+## 第 8 步：确认全局通信链路
 命令：
 `rqt_graph`
 
