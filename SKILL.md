@@ -32,8 +32,8 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
   追加命令：`ros2 daemon status` 和检查 `source`。
 - 有节点但没有控制节点 → 判断启动层问题，停止往下走。
   让用户检查 launch 文件和节点崩溃日志。
-- 有控制节点 → **无条件进入第 2 步，执行 `ros2 topic list`。**
-  **禁止使用 `ros2 control list_controllers` 或其他任何非流程命令替代。**
+- 有控制节点 → **无条件进入第 2 步，执行 `ros2 control list_controllers`。**
+  **禁止跳过第 2 步，禁止用 `ros2 topic list` 替代。**
 
 ## 第 2 步：确认 Controller 状态
 命令：
@@ -49,6 +49,8 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 ## 第 3 步：确认速度指令 Topic 的真实名字
 命令：
 `ros2 topic list`
+
+**本命令整个诊断过程只能执行一次。如果用户已经贴过输出，禁止再次要求执行，直接基于已有输出判断。**
 
 分支处理：
 - 禁止假设 topic 名为 `/cmd_vel` 或 `/diff_drive_controller/cmd_vel`。
