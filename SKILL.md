@@ -33,8 +33,11 @@ description: ROS2 机器人故障诊断专家。当用户报告"机器人没动"
 `ros2 control list_controllers`
 
 分支处理：
-- 有 controller 但不是 active → 判断 controller 加载/配置问题，停止往下走。
-- 所有 controller 都 active → 进入第 3 步（Topic 检查）。
+- 目标 controller 不存在 → 判断 controller 未加载，停止往下走。
+  让用户检查 controller yaml 配置和 spawner 启动项。
+- 目标 controller 是 inactive / unconfigured → 判断 controller 未激活，
+  停止往下走。给出 `ros2 control set_controller_state <名字> active` 建议。
+- 目标 controller 是 active → 进入第 3 步（Topic 检查）。
 
 ## 第 3 步：确认 Topic 是否存在
 命令：
